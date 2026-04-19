@@ -1,4 +1,5 @@
 # goal-aware-proficiency
+<<<<<<< HEAD
 
 > Purpose-conditioned English proficiency assessment model that evaluates learners based on their learning goal (travel, business, academic) alongside absolute CEFR-level scoring.
 
@@ -158,3 +159,6 @@ python src/baseline_ml.py
 ## License
 
 MIT License
+=======
+Purpose-conditioned English proficiency assessment model that evaluates learners based on their learning goal (travel, business, academic) alongside absolute CEFR-level scoring. Built on Speechocean762 with ML/DL baselines toward a dual-head architecture.
+>>>>>>> c7fdf6cb5cdb6433ec86be0e4203348e219388a3

@@ -1,0 +1,33 @@
+{
+  "model": "DualHeadProficiencyModel",
+  "final_metrics": {
+    "goal_pcc": 0.959,
+    "goal_mse": 0.0664,
+    "goal_rmse": 0.2577,
+    "goal_mae": 0.1096,
+    "cefr_acc": 0.8876,
+    "cefr_acc_pm1": 1.0
+  },
+  "purpose_weights": {
+    "travel": {
+      "accuracy": 0.4,
+      "completeness": 0.1,
+      "fluency": 0.3,
+      "prosodic": 0.2
+    },
+    "business": {
+      "accuracy": 0.3,
+      "completeness": 0.4,
+      "fluency": 0.2,
+      "prosodic": 0.1
+    },
+    "academic": {
+      "accuracy": 0.2,
+      "completeness": 0.3,
+      "fluency": 0.2,
+      "prosodic": 0.3
+    }
+  },
+  "epochs": 50,
+  "device": "cpu"
+}

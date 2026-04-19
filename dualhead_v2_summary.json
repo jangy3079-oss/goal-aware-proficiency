@@ -1,0 +1,12 @@
+{
+  "model": "DualHeadV2",
+  "final_metrics": {
+    "goal_pcc": 0.9968,
+    "goal_rmse": 0.1079,
+    "goal_mae": 0.0655,
+    "cefr_acc": 0.8883,
+    "cefr_pm1": 1.0
+  },
+  "device": "cpu",
+  "epochs": 60
+}
