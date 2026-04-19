@@ -1,0 +1,24 @@
+# goal-aware-proficiency
+# Python 3.9+
+
+# Data
+datasets==2.18.0
+pandas==2.2.1
+numpy==1.26.4
+
+# Machine Learning
+scikit-learn==1.4.1
+scipy==1.13.0
+
+# Visualization
+matplotlib==3.8.3
+seaborn==0.13.2
+
+# Notebook
+jupyter==1.0.0
+ipykernel==6.29.3
+
+# (Optional) Deep Learning — needed for future DL modules
+# torch==2.2.1
+# transformers==4.39.3
+# torchaudio==2.2.1

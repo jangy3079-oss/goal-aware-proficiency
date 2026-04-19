@@ -1,0 +1,12 @@
+Feature,Group,RF_Importance,Ridge_Coef_Norm
+accuracy,Pronunciation,0.9067,0.4797
+prosodic,Pronunciation,0.0492,0.1622
+phone_acc_mean,Phone-level,0.0132,0.0083
+phone_acc_std,Phone-level,0.0129,0.0655
+fluency,Fluency,0.0067,0.0486
+word_total_mean,Word-level,0.004,0.0638
+word_acc_std,Word-level,0.0024,0.0509
+phone_acc_min,Phone-level,0.0023,0.0118
+word_acc_mean,Word-level,0.002,0.0763
+word_acc_min,Word-level,0.0006,0.0232
+completeness,Completeness,0.0001,0.0097

@@ -1,0 +1,82 @@
+{
+  "dataset": "speechocean762",
+  "n_train": 2500,
+  "n_test": 2500,
+  "n_features": 11,
+  "feature_cols": [
+    "accuracy",
+    "prosodic",
+    "fluency",
+    "completeness",
+    "word_acc_mean",
+    "word_acc_std",
+    "word_acc_min",
+    "word_total_mean",
+    "phone_acc_mean",
+    "phone_acc_std",
+    "phone_acc_min"
+  ],
+  "models": [
+    {
+      "Model": "Ridge",
+      "Test_PCC": 0.9655,
+      "Test_RMSE": 0.4036,
+      "Test_MAE": 0.3514,
+      "Test_R2": 0.9322
+    },
+    {
+      "Model": "Lasso",
+      "Test_PCC": 0.9629,
+      "Test_RMSE": 0.4349,
+      "Test_MAE": 0.3733,
+      "Test_R2": 0.9212
+    },
+    {
+      "Model": "SVR",
+      "Test_PCC": 0.9466,
+      "Test_RMSE": 0.5013,
+      "Test_MAE": 0.3032,
+      "Test_R2": 0.8953
+    },
+    {
+      "Model": "RandomForest",
+      "Test_PCC": 0.9602,
+      "Test_RMSE": 0.4326,
+      "Test_MAE": 0.265,
+      "Test_R2": 0.922
+    },
+    {
+      "Model": "GradientBoosting",
+      "Test_PCC": 0.9652,
+      "Test_RMSE": 0.4061,
+      "Test_MAE": 0.2948,
+      "Test_R2": 0.9313
+    }
+  ],
+  "purpose_weights": {
+    "Equal (Baseline)": {
+      "accuracy": 0.25,
+      "completeness": 0.25,
+      "fluency": 0.25,
+      "prosodic": 0.25
+    },
+    "Travel": {
+      "accuracy": 0.4,
+      "completeness": 0.1,
+      "fluency": 0.3,
+      "prosodic": 0.2
+    },
+    "Business/Job": {
+      "accuracy": 0.3,
+      "completeness": 0.4,
+      "fluency": 0.2,
+      "prosodic": 0.1
+    },
+    "Academic": {
+      "accuracy": 0.2,
+      "completeness": 0.3,
+      "fluency": 0.2,
+      "prosodic": 0.3
+    }
+  }
+}
