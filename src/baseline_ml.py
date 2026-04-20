@@ -193,6 +193,18 @@ def build_models() -> Dict:
                                        ('model',  GradientBoostingRegressor(
                                            n_estimators=100, random_state=SEED))]),
     }
+    try:
+        from xgboost import XGBRegressor
+        models['XGBoost'] = Pipeline([('scaler', StandardScaler()),
+                                      ('model', XGBRegressor(
+                                          n_estimators=200, max_depth=6,
+                                          learning_rate=0.1, random_state=42,
+                                          verbosity=0))])
+    except ImportError:
+        pass
+    return models
+    
+    
 
 
 # ══════════════════════════════════════════════════════════════════════════════
