@@ -1,0 +1,88 @@
+# ============================================================
+# goal-aware-proficiency: Experiment Configuration
+# ============================================================
+# 모든 하이퍼파라미터를 여기서 관리.
+# 실험할 때 이 파일만 바꾸면 됨 (코드 수정 불필요)
+
+project:
+  name: "goal-aware-proficiency"
+  entity: null          # WandB 팀명 (개인이면 null)
+  run_name: "dualhead-v2-baseline"
+  tags: ["dual-head", "purpose-conditioned", "speechocean762"]
+
+data:
+  dataset: "mispeech/speechocean762"
+  train_split: "train"
+  test_split: "test"
+  # 문장 레벨 피처 (가중치 계산에 사용)
+  sentence_feats: ["accuracy", "completeness", "fluency", "prosodic"]
+  # 모델 입력 피처 (11개)
+  feature_cols:
+    - accuracy
+    - prosodic
+    - fluency
+    - completeness
+    - word_acc_mean
+    - word_acc_std
+    - word_acc_min
+    - word_total_mean
+    - phone_acc_mean
+    - phone_acc_std
+    - phone_acc_min
+
+purposes:
+  list: ["travel", "business", "academic"]
+  # 목적별 사전 가중치 (논문 Table 1 — TOEIC/TOEFL/IELTS 설계 근거)
+  weights:
+    travel:
+      accuracy: 0.40
+      completeness: 0.10
+      fluency: 0.30
+      prosodic: 0.20
+    business:
+      accuracy: 0.30
+      completeness: 0.40
+      fluency: 0.20
+      prosodic: 0.10
+    academic:
+      accuracy: 0.20
+      completeness: 0.30
+      fluency: 0.20
+      prosodic: 0.30
+
+# CEFR 레벨 매핑 (총점 0~10 → 6단계)
+cefr:
+  labels: ["A1", "A2", "B1", "B2", "C1", "C2"]
+  thresholds: [2.0, 4.0, 6.0, 7.5, 9.0]  # 각 레벨 상한선
+
+model:
+  input_dim: 11           # feature_cols 개수
+  purpose_emb_dim: 16     # 목적 임베딩 차원
+  hidden_dim: 64          # 공유 인코더 히든 차원
+  num_purposes: 3
+  num_cefr: 6
+  dropout: 0.3
+
+training:
+  epochs: 60
+  batch_size: 128
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  seed: 42
+  # Multi-task loss 가중치
+  # Uncertainty Weighting 사용 시 아래 값은 초기값으로만 쓰임
+  goal_loss_weight: 0.6
+  cefr_loss_weight: 0.4
+  # Uncertainty Weighting 켜기/끄기
+  use_uncertainty_weighting: true
+
+wandb:
+  enabled: true
+  log_interval: 1         # 매 에폭마다 로깅
+  log_weights: true       # 목적별 학습 가중치 히트맵 로깅
+  watch_model: false      # 모델 gradient 추적 (느려질 수 있음)
+
+output:
+  save_dir: "./results"
+  save_model: true
+  model_filename: "dualhead_v2.pth"
