@@ -1,0 +1,7 @@
+Experiment,Goal PCC,Goal RMSE,Goal MAE,CEFR Acc,CEFR ±1
+Baseline 1: Ridge,0.9655,0.4036,0.3514,N/A,N/A
+Baseline 2: Single-Head MLP,0.9627,0.422,0.2996,N/A,N/A
+Ablation A: Fixed Loss Weight,0.998,0.0761,0.0399,0.8847,1.0
+Ablation B: Fixed Purpose Weight,0.9958,0.1523,0.1118,0.8867,1.0
+Ablation A+B: Both Fixed,0.9968,0.1314,0.0904,0.8873,1.0
+Ours: Full DualHead v2,0.9968,0.0974,0.0479,0.8841,1.0
