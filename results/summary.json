@@ -51,6 +51,13 @@
       "Test_RMSE": 0.4061,
       "Test_MAE": 0.2948,
       "Test_R2": 0.9313
+    },
+    {
+      "Model": "XGBoost",
+      "Test_PCC": 0.9602,
+      "Test_RMSE": 0.4335,
+      "Test_MAE": 0.2858,
+      "Test_R2": 0.9217
     }
   ],
   "purpose_weights": {

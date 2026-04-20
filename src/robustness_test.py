@@ -71,16 +71,50 @@ TRAIN_WEIGHTS = {
                  'fluency' : 0.20, 'prosodic'    : 0.30},
 }
 
-# ── 테스트용 가중치 (의도적으로 다르게 설정) ──────────────────
-# academic만 변경: completeness ↑, accuracy ↓, fluency ↓
-# 모델이 암기했다면 이 가중치로 평가할 때 PCC가 크게 떨어져야 함
-TEST_WEIGHTS_SHIFTED = {
-    'travel'  : {'accuracy': 0.40, 'completeness': 0.10,   # 동일
+# ── 테스트용 가중치 3가지 케이스 ──────────────────────────────
+# academic만 변경 (travel/business는 동일 유지)
+# 케이스가 클수록 이동 폭이 커짐 → 더 강한 robustness 증거
+
+# Case 1: 소폭 이동 (±0.05)
+TEST_WEIGHTS_CASE1 = {
+    'travel'  : {'accuracy': 0.40, 'completeness': 0.10,
                  'fluency' : 0.30, 'prosodic'    : 0.20},
-    'business': {'accuracy': 0.30, 'completeness': 0.40,   # 동일
+    'business': {'accuracy': 0.30, 'completeness': 0.40,
                  'fluency' : 0.20, 'prosodic'    : 0.10},
-    'academic': {'accuracy': 0.15, 'completeness': 0.35,   # ← 변경
+    'academic': {'accuracy': 0.15, 'completeness': 0.35,   # ±0.05
                  'fluency' : 0.15, 'prosodic'    : 0.35},
+}
+
+# Case 2: 중폭 이동 — accuracy와 completeness 역전
+# 학습: accuracy=0.20(낮음), completeness=0.30(중간)
+# 테스트: accuracy=0.30(높음), completeness=0.15(낮음) → 우선순위 반전
+TEST_WEIGHTS_CASE2 = {
+    'travel'  : {'accuracy': 0.40, 'completeness': 0.10,
+                 'fluency' : 0.30, 'prosodic'    : 0.20},
+    'business': {'accuracy': 0.30, 'completeness': 0.40,
+                 'fluency' : 0.20, 'prosodic'    : 0.10},
+    'academic': {'accuracy': 0.30, 'completeness': 0.15,   # 역전
+                 'fluency' : 0.30, 'prosodic'    : 0.25},
+}
+
+# Case 3: 극단적 이동 — completeness에 절반 몰기
+# 학습: completeness=0.30 / 테스트: completeness=0.50 → 극단적 편중
+TEST_WEIGHTS_CASE3 = {
+    'travel'  : {'accuracy': 0.40, 'completeness': 0.10,
+                 'fluency' : 0.30, 'prosodic'    : 0.20},
+    'business': {'accuracy': 0.30, 'completeness': 0.40,
+                 'fluency' : 0.20, 'prosodic'    : 0.10},
+    'academic': {'accuracy': 0.10, 'completeness': 0.50,   # completeness에 절반
+                 'fluency' : 0.10, 'prosodic'    : 0.30},
+}
+
+# 하위 호환성 유지
+TEST_WEIGHTS_SHIFTED = TEST_WEIGHTS_CASE1
+
+ALL_TEST_CASES = {
+    'Case 1 (±0.05)' : TEST_WEIGHTS_CASE1,
+    'Case 2 (reversed)' : TEST_WEIGHTS_CASE2,
+    'Case 3 (extreme)': TEST_WEIGHTS_CASE3,
 }
 
 
@@ -256,63 +290,67 @@ def evaluate_by_purpose(model, test_df, scaler,
     return results
 
 
-def plot_robustness(results_orig: Dict, results_shift: Dict,
-                    save_dir: str) -> None:
+def plot_robustness_multi(results_orig: Dict,
+                          all_case_results: Dict,
+                          save_dir: str) -> None:
     """
-    원래 가중치 vs 변경된 가중치로 평가한 결과 비교.
-    목적별로 PCC, RMSE를 나란히 보여줌.
+    3가지 이동 케이스의 academic PCC/RMSE 변화를 한 번에 비교.
+    논문 Figure용 — 이동 폭이 커져도 PCC가 유지됨을 시각화.
     """
-    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+    case_names = list(all_case_results.keys())
+    orig_pcc   = results_orig['academic']['PCC']
+    orig_rmse  = results_orig['academic']['RMSE']
+
+    shifted_pccs  = [all_case_results[c]['academic']['PCC']  for c in case_names]
+    shifted_rmses = [all_case_results[c]['academic']['RMSE'] for c in case_names]
+
+    fig, axes = plt.subplots(1, 2, figsize=(13, 5))
     fig.suptitle(
-        'Robustness Test: Train Weights vs Shifted Test Weights\n'
-        '(Academic purpose only shifted: [0.20,0.30,0.20,0.30] → [0.15,0.35,0.15,0.35])',
+        'Robustness Test: Academic Purpose under Shifted Test Weights\n'
+        'Train weights fixed at [0.20, 0.30, 0.20, 0.30]',
         fontsize=11, fontweight='bold'
     )
 
-    x      = np.arange(len(PURPOSES))
-    width  = 0.35
-    colors = ['#4C72B0', '#C44E52']
+    x      = np.arange(len(case_names))
+    colors = ['#4C72B0', '#e67e22', '#C44E52']
+    labels = [
+        'Case 1: ±0.05\n[0.15,0.35,0.15,0.35]',
+        'Case 2: Reversed\n[0.30,0.15,0.30,0.25]',
+        'Case 3: Extreme\n[0.10,0.50,0.10,0.30]',
+    ]
 
-    for ax, metric, title in zip(
+    for ax, orig_val, shifted_vals, metric, title, better in zip(
         axes,
+        [orig_pcc,  orig_rmse],
+        [shifted_pccs, shifted_rmses],
         ['PCC', 'RMSE'],
-        ['(A) PCC — higher is better', '(B) RMSE — lower is better']
+        ['(A) PCC — higher is better', '(B) RMSE — lower is better'],
+        ['high', 'low']
     ):
-        orig  = [results_orig[p][metric]  for p in PURPOSES]
-        shift = [results_shift[p][metric] for p in PURPOSES]
+        # 원래 값 점선
+        ax.axhline(orig_val, color='green', lw=2, ls='--',
+                   label=f'Original ({orig_val:.4f})', zorder=3)
 
-        b1 = ax.bar(x - width/2, orig,  width, label='Original weights',
-                    color=colors[0], alpha=0.85)
-        b2 = ax.bar(x + width/2, shift, width, label='Shifted weights (academic)',
-                    color=colors[1], alpha=0.85)
+        bars = ax.bar(x, shifted_vals, color=colors, alpha=0.85,
+                      edgecolor='white', linewidth=0.5, width=0.5)
 
-        for bar, val in zip(b1, orig):
+        for bar, val in zip(bars, shifted_vals):
+            delta = val - orig_val
             ax.text(bar.get_x() + bar.get_width()/2,
-                    bar.get_height() + 0.002,
-                    f'{val:.4f}', ha='center', va='bottom', fontsize=9)
-        for bar, val in zip(b2, shift):
-            ax.text(bar.get_x() + bar.get_width()/2,
-                    bar.get_height() + 0.002,
-                    f'{val:.4f}', ha='center', va='bottom', fontsize=9)
+                    bar.get_height() + (0.001 if metric == 'PCC' else 0.002),
+                    f'{val:.4f}\n({delta:+.4f})',
+                    ha='center', va='bottom', fontsize=9, fontweight='bold')
 
         ax.set_xticks(x)
-        ax.set_xticklabels(PURPOSES, fontsize=11)
+        ax.set_xticklabels(labels, fontsize=8)
         ax.set_title(title, fontweight='bold')
         ax.legend(fontsize=9)
         ax.grid(axis='y', alpha=0.3)
 
-    # academic 차이 강조 화살표
-    ax = axes[0]
-    orig_ac  = results_orig['academic']['PCC']
-    shift_ac = results_shift['academic']['PCC']
-    diff     = orig_ac - shift_ac
-    ax.annotate(
-        f'Δ={diff:+.4f}',
-        xy=(2 + width/2, shift_ac),
-        xytext=(2 + width/2 + 0.3, shift_ac - 0.01),
-        fontsize=9, color='red', fontweight='bold',
-        arrowprops=dict(arrowstyle='->', color='red')
-    )
+        if metric == 'PCC':
+            ax.set_ylim(max(0, min(shifted_vals) - 0.05), 1.02)
+        else:
+            ax.set_ylim(0, max(shifted_vals) * 1.3)
 
     plt.tight_layout()
     out = Path(save_dir) / 'robustness_plot.png'
@@ -340,111 +378,91 @@ def main():
     set_seed(SEED)
 
     print("=" * 62)
-    print("Robustness Test: Shifted Test Weights")
+    print("Robustness Test: Shifted Test Weights (3 Cases)")
     print(f"Epochs: {args.epochs} | Device: {DEVICE}")
     print("=" * 62)
     print("\n[Design]")
-    print("  Train academic: [0.20, 0.30, 0.20, 0.30]")
-    print("  Test  academic: [0.15, 0.35, 0.15, 0.35]  ← shifted")
-    print("  If PCC drops sharply → model memorized the formula")
-    print("  If PCC stays stable  → model learned real patterns")
+    print("  Train academic : [0.20, 0.30, 0.20, 0.30]  (fixed)")
+    print("  Case 1 (±0.05) : [0.15, 0.35, 0.15, 0.35]  small shift")
+    print("  Case 2 (reversed): [0.30, 0.15, 0.30, 0.25]  priority reversed")
+    print("  Case 3 (extreme) : [0.10, 0.50, 0.10, 0.30]  completeness x5")
+    print("  → If PCC drops sharply: model memorized the formula")
+    print("  → If PCC stays stable : model learned real patterns")
 
     # 데이터 로드
     train_df, test_df = load_base_data()
-
-    # 학습 데이터셋 (TRAIN_WEIGHTS)
     train_ds = RobustnessDataset(
         train_df, scaler=None,
         purpose_weights=TRAIN_WEIGHTS, fit_scaler=True
     )
 
-    # 모델 학습
+    # 모델 학습 (한 번만)
     print(f"\n[Training] {args.epochs} epochs with TRAIN_WEIGHTS...")
     model = train_model(cfg, train_ds, DEVICE, args.epochs)
     print("  Training complete.")
 
-    # 평가 1: 원래 가중치로 평가
-    print("\n[Eval 1] Original test weights (same as train)...")
-    test_ds_orig = RobustnessDataset(
-        test_df, scaler=train_ds.scaler,
-        purpose_weights=TRAIN_WEIGHTS
-    )
-    ld_orig = DataLoader(test_ds_orig, batch_size=256, shuffle=False)
-    overall_orig = evaluate_model(model, ld_orig, DEVICE)
+    # 원래 가중치 평가
+    print("\n[Eval 0] Original weights (same as train)...")
     by_purpose_orig = evaluate_by_purpose(
         model, test_df, train_ds.scaler, TRAIN_WEIGHTS, DEVICE
     )
 
-    # 평가 2: 변경된 가중치로 평가
-    print("[Eval 2] Shifted test weights (academic only shifted)...")
-    test_ds_shift = RobustnessDataset(
-        test_df, scaler=train_ds.scaler,
-        purpose_weights=TEST_WEIGHTS_SHIFTED
-    )
-    ld_shift = DataLoader(test_ds_shift, batch_size=256, shuffle=False)
-    overall_shift = evaluate_model(model, ld_shift, DEVICE)
-    by_purpose_shift = evaluate_by_purpose(
-        model, test_df, train_ds.scaler, TEST_WEIGHTS_SHIFTED, DEVICE
-    )
+    # 3가지 케이스 평가
+    all_case_results = {}
+    for case_name, case_weights in ALL_TEST_CASES.items():
+        print(f"[Eval] {case_name}...")
+        all_case_results[case_name] = evaluate_by_purpose(
+            model, test_df, train_ds.scaler, case_weights, DEVICE
+        )
 
     # 결과 출력
-    print("\n" + "=" * 62)
-    print("ROBUSTNESS TEST RESULTS")
-    print("=" * 62)
+    print("\n" + "=" * 70)
+    print("ROBUSTNESS TEST RESULTS — Academic Purpose PCC")
+    print("=" * 70)
+    print(f"\n  {'Case':<22} {'Original':>10} {'Shifted':>10} {'Δ PCC':>10} {'Verdict':>15}")
+    print("  " + "-" * 70)
 
-    print(f"\n  Overall:")
-    print(f"  {'Metric':<8} {'Original':>12} {'Shifted':>12} {'Δ':>10}")
-    print("  " + "-" * 44)
-    for m in ['PCC', 'RMSE', 'MAE', 'CEFR']:
-        o = overall_orig[m]
-        s = overall_shift[m]
-        print(f"  {m:<8} {o:>12.4f} {s:>12.4f} {s-o:>+10.4f}")
-
-    print(f"\n  By Purpose (PCC):")
-    print(f"  {'Purpose':<12} {'Original':>10} {'Shifted':>10} {'Δ':>10} {'Verdict':>20}")
-    print("  " + "-" * 62)
-    for p in PURPOSES:
-        o = by_purpose_orig[p]['PCC']
-        s = by_purpose_shift[p]['PCC']
-        d = s - o
-        shifted = "(shifted)" if p == 'academic' else ""
-        verdict = "Memorized?" if abs(d) > 0.05 else "Robust"
-        print(f"  {p:<12} {o:>10.4f} {s:>10.4f} {d:>+10.4f} "
-              f"{verdict:>15} {shifted}")
+    orig_ac = by_purpose_orig['academic']['PCC']
+    rows = []
+    for case_name, case_res in all_case_results.items():
+        shift_ac = case_res['academic']['PCC']
+        delta    = shift_ac - orig_ac
+        verdict  = "Robust ✓" if abs(delta) < 0.02 else \
+                   "Partial"  if abs(delta) < 0.05 else \
+                   "Memorized ✗"
+        print(f"  {case_name:<22} {orig_ac:>10.4f} {shift_ac:>10.4f} "
+              f"{delta:>+10.4f} {verdict:>15}")
+        rows.append({
+            'Case'        : case_name,
+            'PCC_original': orig_ac,
+            'PCC_shifted' : shift_ac,
+            'Delta_PCC'   : round(delta, 4),
+            'RMSE_original': by_purpose_orig['academic']['RMSE'],
+            'RMSE_shifted' : case_res['academic']['RMSE'],
+            'Verdict'     : verdict,
+        })
 
     # 핵심 해석
-    academic_drop = by_purpose_orig['academic']['PCC'] - \
-                    by_purpose_shift['academic']['PCC']
+    max_drop = max(abs(r['Delta_PCC']) for r in rows)
     print(f"\n  [핵심 해석]")
-    if abs(academic_drop) < 0.02:
-        print(f"  Academic PCC 변화: {academic_drop:+.4f} → 거의 없음")
-        print(f"  → 모델이 단순 수식 암기가 아닌 실제 패턴을 학습했을 가능성")
-        print(f"  → 논문에서 robustness 증거로 사용 가능")
-    elif abs(academic_drop) < 0.05:
-        print(f"  Academic PCC 변화: {academic_drop:+.4f} → 소폭 감소")
-        print(f"  → 부분적 암기 + 부분적 패턴 학습 혼재")
-        print(f"  → Limitation에서 솔직하게 언급 필요")
+    print(f"  최대 PCC 변화량: {max_drop:.4f} (Case 3 극단적 이동 기준)")
+    if max_drop < 0.02:
+        print("  → 모든 케이스에서 Robust: 모델이 공식 암기가 아닌 패턴을 학습")
+        print("  → 논문 robustness 증거로 강하게 사용 가능")
+    elif max_drop < 0.05:
+        print("  → 부분적 Robust: 소폭~중폭 이동에서는 안정적")
+        print("  → Limitation에서 극단적 케이스 언급 필요")
     else:
-        print(f"  Academic PCC 변화: {academic_drop:+.4f} → 큰 폭 감소")
-        print(f"  → 수식 암기 가능성 높음")
-        print(f"  → Limitation에서 명확히 언급 필요")
+        print("  → 극단적 이동에서 PCC 감소: 대리 레이블 의존성 존재")
+        print("  → Limitation에서 솔직하게 논의 필요")
 
     # 저장
-    rows = []
-    for p in PURPOSES:
-        o = by_purpose_orig[p]
-        s = by_purpose_shift[p]
-        rows.append({
-            'Purpose'     : p,
-            'PCC_original': o['PCC'],  'PCC_shifted': s['PCC'],
-            'RMSE_original': o['RMSE'],'RMSE_shifted': s['RMSE'],
-            'Delta_PCC'   : round(s['PCC'] - o['PCC'], 4),
-        })
     df_res = pd.DataFrame(rows)
     df_res.to_csv(f'{args.save_dir}/robustness_results.csv', index=False)
     print(f"\n[Save] {args.save_dir}/robustness_results.csv")
 
-    plot_robustness(by_purpose_orig, by_purpose_shift, args.save_dir)
+    # 시각화 (3케이스 비교)
+    plot_robustness_multi(by_purpose_orig, all_case_results, args.save_dir)
     print("\nDone.")
 
 

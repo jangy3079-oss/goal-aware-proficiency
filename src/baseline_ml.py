@@ -35,6 +35,12 @@ from sklearn.svm import SVR
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
+try:
+    from xgboost import XGBRegressor
+    XGBOOST_AVAILABLE = True
+except ImportError:
+    XGBOOST_AVAILABLE = False
+    print("[Warning] xgboost not installed. Run: pip install xgboost")
 from sklearn.model_selection import cross_val_score, KFold
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from scipy import stats as scipy_stats
@@ -176,7 +182,7 @@ def build_models() -> Dict:
     Bamdev(2023) 논문에서 사용한 모델들 + 추가 모델.
     StandardScaler → 모델 파이프라인으로 구성.
     """
-    return {
+    models = {
         # 선형 모델 (해석 용이, 논문 baseline으로 자주 쓰임)
         'Ridge'           : Pipeline([('scaler', StandardScaler()),
                                        ('model',  Ridge(alpha=1.0, random_state=SEED))]),
@@ -193,18 +199,19 @@ def build_models() -> Dict:
                                        ('model',  GradientBoostingRegressor(
                                            n_estimators=100, random_state=SEED))]),
     }
-    try:
-        from xgboost import XGBRegressor
+    # XGBoost 추가 (논문 baseline: 트리 앙상블 SOTA)
+    if XGBOOST_AVAILABLE:
         models['XGBoost'] = Pipeline([('scaler', StandardScaler()),
-                                      ('model', XGBRegressor(
-                                          n_estimators=200, max_depth=6,
-                                          learning_rate=0.1, random_state=42,
-                                          verbosity=0))])
-    except ImportError:
-        pass
+                                      ('model',  XGBRegressor(
+                                          n_estimators=200,
+                                          max_depth=6,
+                                          learning_rate=0.1,
+                                          subsample=0.8,
+                                          colsample_bytree=0.8,
+                                          random_state=SEED,
+                                          verbosity=0,
+                                      ))])
     return models
-    
-    
 
 
 # ══════════════════════════════════════════════════════════════════════════════
