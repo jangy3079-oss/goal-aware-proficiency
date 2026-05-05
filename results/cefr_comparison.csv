@@ -1,0 +1,5 @@
+Model,Exact Acc,±1 Acc,Macro F1
+C1: Ridge→Threshold,0.8016,1.0,0.6795
+C3: SVM Direct,0.8832,1.0,0.6035
+C4: RF Direct,0.8704,1.0,0.6823
+Ours: DualHead CEFR,0.8879,1.0,0.5814
