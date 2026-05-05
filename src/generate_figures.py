@@ -358,6 +358,67 @@ def plot_weight_heatmap(model, device, save_dir):
     plt.close()
     print(f"[Save] {out}")
 
+# ══════════════════════════════════════════════════════════════
+# Figure 5: GOPT Target Fair Comparison
+# ══════════════════════════════════════════════════════════════
+
+def plot_gopt_comparison(save_dir):
+    """
+    논문 추가 실험:
+    GOPT (Gong et al., 2022)와 동일 타겟(total score)으로
+    PCDH를 재학습했을 때의 fair comparison 결과.
+    """
+    json_path = Path(save_dir) / 'pcdh_gopt_target_results.json'
+    if not json_path.exists():
+        print(f"[Skip] {json_path} not found. Run eval_on_gopt_target.py first.")
+        return
+
+    import json
+    with open(json_path) as f:
+        data = json.load(f)
+
+    ridge = data['ridge_total']
+    pcdh  = data['pcdh_total']
+
+    models = ['Ridge\n(→ total)', 'PCDH\n(→ total)']
+    colors = ['#95a5a6', '#2ecc71']
+
+    fig, axes = plt.subplots(1, 3, figsize=(13, 5))
+    fig.suptitle('Figure 5: Fair Comparison on GOPT Target (Speechocean762 total score)\n'
+                 'Reference: Gong et al. ICASSP 2022 — same dataset & target',
+                 fontsize=11, fontweight='bold')
+
+    for ax, metric, label, better in zip(
+        axes,
+        ['PCC', 'RMSE', 'MAE'],
+        ['PCC ↑', 'RMSE ↓', 'MAE ↓'],
+        ['higher', 'lower', 'lower'],
+    ):
+        vals = [ridge[metric], pcdh[metric]]
+        bars = ax.bar(models, vals, color=colors, alpha=0.85,
+                      edgecolor='white', linewidth=0.5, width=0.4)
+        for bar, val in zip(bars, vals):
+            ax.text(bar.get_x() + bar.get_width() / 2,
+                    bar.get_height() + max(vals) * 0.01,
+                    f'{val:.4f}', ha='center', va='bottom',
+                    fontsize=11, fontweight='bold')
+        ax.set_title(label, fontweight='bold')
+        ax.set_ylim(0, max(vals) * 1.18)
+        ax.grid(axis='y', alpha=0.3)
+
+    # CEFR Acc / ±1 텍스트 박스
+    cefr_acc = pcdh.get('CEFR_Acc', 0)
+    cefr_pm1 = pcdh.get('CEFR_pm1', 0)
+    fig.text(0.5, 0.01,
+             f'PCDH CEFR Exact Acc: {cefr_acc:.3f}  |  CEFR ±1 Acc: {cefr_pm1:.3f}',
+             ha='center', fontsize=10,
+             bbox=dict(boxstyle='round', facecolor='#eaf4ea', alpha=0.7))
+
+    plt.tight_layout(rect=[0, 0.06, 1, 1])
+    out = Path(save_dir) / 'figure5_gopt_fair_comparison.png'
+    plt.savefig(out, dpi=150, bbox_inches='tight')
+    plt.close()
+    print(f"[Save] {out}")
 
 # ══════════════════════════════════════════════════════════════
 # 메인
@@ -407,6 +468,7 @@ def main():
     plot_ablation_bars(args.save_dir)
     plot_cefr_confusion(model, test_ds, DEVICE, args.save_dir)
     plot_weight_heatmap(model, DEVICE, args.save_dir)
+    plot_gopt_comparison(args.save_dir)
 
     # 궤적 CSV 저장
     pd.DataFrame(trajectory).to_csv(
@@ -419,6 +481,7 @@ def main():
     print(f"  {args.save_dir}/figure2_ablation_bars.png")
     print(f"  {args.save_dir}/figure3_cefr_confusion.png")
     print(f"  {args.save_dir}/figure4_weight_heatmap.png")
+    print(f"  {args.save_dir}/figure5_gopt_fair_comparison.png")
     print("=" * 62)
 
 
