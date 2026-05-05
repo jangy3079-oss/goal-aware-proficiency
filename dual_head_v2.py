@@ -288,21 +288,22 @@ class DualHeadModelV2(nn.Module):
     아키텍처:
       [피처 입력 (11차원)]
             ↓
-      [Feature Encoder] ← 피처 표현 학습
-            ↓                           ↑ [Purpose Embedding]
-      [Fusion: concat]                  |
-            ↓                           |
-      [Shared Encoder]                  |
-       ┌────┴────┐          [Purpose Weight Generator]
-       ↓         ↓                    ↓
-    [Goal Head] [CEFR Head]  [Weighted Sum of sent. feats]
-    (회귀)      (분류)         ↓
-       ↓         ↓          goal_score (목적 맞춤 점수)
-    0~10점    A1~C2
+      [Feature Encoder]
+            ↓
+      [Shared Encoder]   ← purpose 없음, 순수 언어 능력 표현
+       ┌────┴────┐
+       ↓         ↓
+    [Goal Head] [CEFR Head]    [Purpose Weight Generator]
+    (+ purpose   (분류)                ↓
+     emb +       A1~C2         [Weighted Sum]
+     weighted_sum)
+       ↓
+     0~10점
 
     v2 핵심:
-      Goal Head의 타겟이 "PurposeWeightGenerator가 생성한 가중치 × 피처"
-      → 모델이 목적별로 어떤 피처를 중시해야 하는지 스스로 학습
+      - Shared Encoder: purpose-free → 두 head가 공통 언어 능력 표현 공유
+      - Goal Head: shared 표현 + purpose_emb + weighted_sum → 목적 맞춤 점수
+      - CEFR Head: shared 표현만 → 목적과 완전 독립된 절대 숙달도 예측
     """
 
     def __init__(
@@ -331,10 +332,10 @@ class DualHeadModelV2(nn.Module):
             nn.Dropout(dropout),
         )
 
-        # ── 공유 인코더 (피처 표현 + 목적 임베딩 융합) ───────────
-        fusion_dim = hidden_dim + purpose_emb_dim
+        # ── 공유 인코더 (purpose 없음) ───────────────────────────
+        # 두 head가 공통으로 사용하는 순수 언어 능력 표현 학습
         self.shared_encoder = nn.Sequential(
-            nn.Linear(fusion_dim, hidden_dim),
+            nn.Linear(hidden_dim, hidden_dim),
             nn.LayerNorm(hidden_dim),
             nn.ReLU(),
             nn.Dropout(dropout),
@@ -345,22 +346,23 @@ class DualHeadModelV2(nn.Module):
         )
 
         # ── Head 1: 목적 맞춤 점수 (회귀) ───────────────────────
-        # 입력: shared 표현 + 가중 피처 합산값
+        # 입력: shared 표현 + purpose_emb + weighted_sum
         self.goal_head = nn.Sequential(
-            nn.Linear(hidden_dim + 1, 32),
+            nn.Linear(hidden_dim + purpose_emb_dim + 1, 32),
             nn.ReLU(),
             nn.Linear(32, 1),
             nn.Sigmoid(),
         )
 
         # ── Head 2: CEFR 분류 ────────────────────────────────────
+        # 입력: shared 표현만 → purpose와 완전 독립
         self.cefr_head = nn.Sequential(
             nn.Linear(hidden_dim, 32),
             nn.ReLU(),
             nn.Linear(32, num_cefr),
         )
 
-        # 목적 임베딩 (공유 인코더 입력용)
+        # 목적 임베딩 (goal head 직전 합류용)
         self.purpose_emb_shared = nn.Embedding(num_purposes, purpose_emb_dim)
 
     def forward(
@@ -381,20 +383,17 @@ class DualHeadModelV2(nn.Module):
         # 2) 가중 피처 합산 (목적 맞춤 스칼라 점수)
         weighted_sum = (purpose_weights * sent_feats).sum(dim=-1, keepdim=True)  # (B, 1)
 
-        # 3) 피처 인코딩
+        # 3) 피처 인코딩 → shared 표현 (purpose 없음)
         feat_repr = self.feature_encoder(features)               # (B, hidden)
+        shared    = self.shared_encoder(feat_repr)               # (B, hidden)
 
-        # 4) 목적 임베딩과 융합
-        purp_emb  = self.purpose_emb_shared(purpose_idx)         # (B, emb_dim)
-        fused     = torch.cat([feat_repr, purp_emb], dim=-1)     # (B, hidden+emb)
-        shared    = self.shared_encoder(fused)                    # (B, hidden)
-
-        # 5) Head 1: shared 표현 + 가중합을 함께 입력
-        goal_in    = torch.cat([shared, weighted_sum], dim=-1)   # (B, hidden+1)
-        goal_score = self.goal_head(goal_in).squeeze(-1) * 10.0  # (B,) 0~10
-
-        # 6) Head 2: CEFR 분류 (목적과 무관한 절대 능력)
+        # 4) Head 2: CEFR 분류 — shared 표현만 사용, purpose와 완전 독립
         cefr_logits = self.cefr_head(shared)                     # (B, 6)
+
+        # 5) Head 1: shared 표현 + purpose_emb + weighted_sum 합류
+        purp_emb  = self.purpose_emb_shared(purpose_idx)         # (B, emb_dim)
+        goal_in   = torch.cat([shared, purp_emb, weighted_sum], dim=-1)  # (B, hidden+emb+1)
+        goal_score = self.goal_head(goal_in).squeeze(-1) * 10.0  # (B,) 0~10
 
         return goal_score, cefr_logits, purpose_weights
 
